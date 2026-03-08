@@ -1,5 +1,5 @@
 import React from 'react';
-import { MoodProfile } from '../types';
+import { MoodProfile } from '../src/types';
 
 interface ShareCardProps {
   profile: MoodProfile;
@@ -10,7 +10,6 @@ interface ShareCardProps {
 
 const ShareCard: React.FC<ShareCardProps> = ({ profile, imageUrl, userName, id }) => {
   const displayTraits = profile.archetypeTraits.slice(0, 2);
-  
   // High-fidelity, detailed Resonance Module
   const SongAestheticDisplay = () => (
     <div className="w-full py-4 px-5 bg-white/20 rounded-[2rem] border border-white/40 shadow-[0_15px_40px_rgba(0,0,0,0.4)] hover:bg-white/25 transition-colors duration-500">
@@ -52,8 +51,8 @@ const ShareCard: React.FC<ShareCardProps> = ({ profile, imageUrl, userName, id }
         {imageUrl ? (
           <img 
             src={imageUrl} 
-            alt="Atmosphere" 
-            className="w-full h-full object-cover saturate-[1.8] brightness-[0.85]"
+            alt="Persona Background" 
+            className="w-full h-full object-cover saturate-[1.8] brightness-[0.85]" 
           />
         ) : (
           <div 

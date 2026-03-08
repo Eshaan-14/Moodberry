@@ -1,5 +1,5 @@
 import React from 'react';
-import { CuratedImage } from '../types';
+import { CuratedImage } from '../src/types';
 
 interface ImageGridProps {
   images: CuratedImage[];

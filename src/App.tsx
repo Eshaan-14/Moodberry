@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppStep, CuratedImage, MoodKit } from './types';
-import ImageGrid from './components/ImageGrid';
-import ResultView from './components/ResultView';
+import ImageGrid from '../components/ImageGrid';
+import ResultView from '../components/ResultView';
 import { geminiService } from './services/geminiService';
 import { CURATED_IMAGES } from './constants';
 

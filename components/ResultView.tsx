@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { MoodKit, CuratedImage } from '../types';
+import { MoodKit, CuratedImage } from '../src/types';
 import ShareCard from './ShareCard';
 import * as htmlToImage from 'html-to-image';
 
@@ -33,6 +33,7 @@ const ResultView: React.FC<ResultViewProps> = ({ kit, selectedImages = [], onRes
           backgroundColor: '#000000',
           skipAutoScale: true,
           cacheBust: false,
+          useCORS: true,
         });
         
         if (isMounted && blob) {
@@ -67,7 +68,8 @@ const ResultView: React.FC<ResultViewProps> = ({ kit, selectedImages = [], onRes
       const dataUrl = await htmlToImage.toJpeg(exportRef.current, {
         quality: 0.95,
         pixelRatio: 2, // Consistent quality
-        backgroundColor: '#000000', // Ensure black background for transparency
+        backgroundColor: '#000000',
+        useCORS: true, // Ensure black background for transparency
         style: {
            transform: 'none'
         }
@@ -99,7 +101,8 @@ const ResultView: React.FC<ResultViewProps> = ({ kit, selectedImages = [], onRes
           pixelRatio: 1.5, 
           backgroundColor: '#000000',
           skipAutoScale: true, 
-          cacheBust: false, 
+          cacheBust: false,
+          useCORS: true, 
         });
       }
 
@@ -251,7 +254,7 @@ const ResultView: React.FC<ResultViewProps> = ({ kit, selectedImages = [], onRes
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
                   )}
-                  {isExporting ? 'Synthesizing...' : 'Share Manifest .png'}
+                  {isExporting ? 'Synthesizing...' : 'Share Manifest .jpg'}
                 </button>
 
                 <button 
@@ -259,7 +262,7 @@ const ResultView: React.FC<ResultViewProps> = ({ kit, selectedImages = [], onRes
                   className="w-full py-5 border-2 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 rounded-3xl text-[11px] font-black uppercase tracking-[0.3em] hover:bg-slate-50 dark:hover:bg-slate-900 transition-all flex items-center justify-center gap-3"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                  Manifest Card .png
+                  Manifest Card .jpg
                 </button>
               </div>
             </div>
@@ -336,7 +339,11 @@ const ResultView: React.FC<ResultViewProps> = ({ kit, selectedImages = [], onRes
           <div className="group relative rounded-[4rem] overflow-hidden bg-white/50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 transition-all duration-700 hover:border-indigo-500/30 shadow-xl dark:shadow-none">
             <div className="aspect-[16/9] w-full relative bg-slate-100 dark:bg-slate-800">
               {wallpaperUrl ? (
-                <img src={wallpaperUrl} alt="Wallpaper" className="w-full h-full object-cover" />
+                <img 
+                  src={wallpaperUrl} 
+                  alt="Wallpaper" 
+                  className="w-full h-full object-cover"             
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center"><div className="w-8 h-8 border-t-2 border-indigo-400 rounded-full animate-spin" /></div>
               )}

@@ -1,6 +1,8 @@
+import dns from 'node:dns';
+import { Buffer } from 'node:buffer';
+dns.setDefaultResultOrder('ipv4first');
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { MoodProfile, CuratedImage } from "../types";
-import { SONG_MAP } from "../constants";
 
 const PERSONA_ADJECTIVES = [
   "Able", "Absolute", "Abstract", "Academic", "Accessible", "Acclaimed", "Accomplished", "Accurate", "Ace", "Active",
@@ -118,115 +120,138 @@ const PERSONA_NOUNS = [
   "Winner", "Witness", "Wizard", "Wonder", "Worker", "Writer", "Youth", "Zealot"
 ];
 
-export class GeminiService {
-  private ai: GoogleGenAI;
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
-  constructor() {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  }
-
-  private async fetchWithRetry(fn: () => Promise<any>, retries = 3, delay = 1000): Promise<any> {
-    try {
-      return await fn();
-    } catch (error: any) {
-      if (retries > 0 && error?.status === 429) {
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return this.fetchWithRetry(fn, retries - 1, delay * 2);
-      }
-      throw error;
+async function fetchWithRetry(fn: () => Promise<any>, retries = 3, delay = 1000): Promise<any> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (retries > 0 && error?.status === 429) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchWithRetry(fn, retries - 1, delay * 2);
     }
-  }
-
-  async synthesizeMood(selectedImages: CuratedImage[]): Promise<MoodProfile> {
-    const tags = selectedImages.flatMap(img => img.tags);
-    const descriptions = selectedImages.map(img => img.description).join(', ');
-
-    const prompt = `Synthesize a high-end personality-driven digital identity strictly using these visual anchors:
-    Visual Data Tags: [${tags.join(', ')}]
-    Content Descriptions: ${descriptions}.
-
-    Guidelines for Synthesis:
-    1. Define a "Persona Name" that MUST be strictly one Adjective + one Noun. 
-       - The Adjective MUST be selected from this list: [${PERSONA_ADJECTIVES.join(', ')}].
-       - The Noun MUST be selected from this list: [${PERSONA_NOUNS.join(', ')}].
-    2. Write a poetic personality summary that is EXACTLY TWO SHORT LINES. It MUST be a direct, high-praise compliment starting with "You...".
-    3. List exactly 3 "Archetype Traits" (single words) that are highly complimentary, unique, and possess a special, elevated vibe.
-    4. Define an "Identity Motif" which is a casual, colloquial, and relatable description of the user's vibe, like something that makes sense for a college student. Avoid overly flowery or abstract language. Keep it punchy and real. Strictly maximum 130 characters. It MUST address the user directly, e.g., "You...".
-    
-    5. Provide an "Aesthetic Analysis" (3 sentences). It MUST be a simple, polite, and descriptive compliment, analyzing the user's visual taste as a rare and admirable quality.
-    6. Select two high-contrast VIBRANT hex colors from the entire color spectrum with poetic names. 
-       - They MUST be distinct and NOT similar to each other (e.g., avoid two shades of blue). 
-       - They MUST be directly derived from the "Visual Data Tags" to represent the visual palette of the user's selection.
-    7. Determine the "Dominant Vibe": exactly one of [calm, energetic, productive, melancholic, romantic, nostalgic, ethereal, industrial, organic, cyberpunk, minimalist, luxury, gothic, retro, futuristic, zen, chaos, dreamy, intense, mysterious, playful, sophisticated, raw, celestial, lofi, cinematic, dark, vibrant, hazy, classic].
-    8. Generate a 9:16 wallpaper prompt.
-
-    Return JSON format.`;
-
-    const response = await this.fetchWithRetry(() => this.ai.models.generateContent({
-      model: 'gemini-3-flash-preview', 
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING },
-            summary: { type: Type.STRING },
-            archetypeTraits: { type: Type.ARRAY, items: { type: Type.STRING }, minItems: 3, maxItems: 3 },
-            identityMotif: { type: Type.STRING },
-            aestheticAnalysis: { type: Type.STRING },
-            primaryColor: { type: Type.STRING },
-            primaryColorName: { type: Type.STRING },
-            secondaryColor: { type: Type.STRING },
-            secondaryColorName: { type: Type.STRING },
-            dominantVibe: { type: Type.STRING },
-            wallpaperPrompt: { type: Type.STRING }
-          },
-          required: ['name', 'summary', 'archetypeTraits', 'identityMotif', 'aestheticAnalysis', 'primaryColor', 'primaryColorName', 'secondaryColor', 'secondaryColorName', 'dominantVibe', 'wallpaperPrompt']
-        }
-      }
-    }));
-
-    const data = JSON.parse(response.text || '{}');
-    
-    // Map the dominant vibe to a curated song
-    const vibeKey = (data.dominantVibe || 'default').toLowerCase();
-    const songList = SONG_MAP[vibeKey] || SONG_MAP['default'];
-    // Pick a random song from the list
-    const songData = songList[Math.floor(Math.random() * songList.length)];
-
-    return {
-      ...data,
-      songName: songData.name,
-      artist: songData.artist,
-      spotifyUrl: songData.spotifyUrl,
-      youtubeUrl: songData.youtubeUrl
-    };
-  }
-
-  async generateWallpaper(prompt: string): Promise<string | null> {
-    try {
-      const response = await this.fetchWithRetry(() => this.ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [{ text: `A professional 4k high-end mobile wallpaper (9:16 aspect ratio). Subject: ${prompt}. Atmospheric, minimalist, cinematic, premium lighting.` }]
-        },
-        config: {
-          imageConfig: { aspectRatio: "9:16" }
-        }
-      }));
-
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Wallpaper generation failed:', error);
-      return null;
-    }
+    throw error;
   }
 }
 
-export const geminiService = new GeminiService();
+export const handler = async (event: any) => {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
+  }
+
+  try {
+    const { action, payload } = JSON.parse(event.body);
+
+    // ROUTE 1: Synthesize Mood (Using Gemini for the "Brain")
+    if (action === 'synthesizeMood') {
+      const tags = payload.flatMap((img: any) => img.tags);
+      const descriptions = payload.map((img: any) => img.description).join(', ');
+
+      const prompt = `Synthesize a high-end personality-driven digital identity strictly using these visual anchors:
+      Visual Data Tags: [${tags.join(', ')}]
+      Content Descriptions: ${descriptions}.
+
+      Guidelines for Synthesis:
+      1. Define a "Persona Name" that MUST be strictly one Adjective + one Noun. 
+         - The Adjective MUST be selected from the provided list: [${PERSONA_ADJECTIVES.join(', ')}].
+         - The Noun MUST be selected from the provided list: [${PERSONA_NOUNS.join(', ')}].
+      2. Write a poetic personality summary that is EXACTLY TWO SHORT LINES. It MUST be a direct, high-praise compliment starting with "You...".
+      3. List exactly 3 "Archetype Traits" (single words).
+      4. Define an "Identity Motif" (max 130 chars). Address the user directly.
+      5. Provide an "Aesthetic Analysis" (3 sentences).
+      6. Select two high-contrast VIBRANT hex colors with poetic names.
+      7. Determine the "Dominant Vibe": one of the provided list.
+      8. Generate a detailed 9:16 wallpaper prompt based on the mood.
+
+      Return JSON format.`;
+
+      // Using gemini-2.5-flash as the stable version for JSON generation
+      const response = await fetchWithRetry(() => ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              summary: { type: Type.STRING },
+              archetypeTraits: { type: Type.ARRAY, items: { type: Type.STRING } },
+              identityMotif: { type: Type.STRING },
+              aestheticAnalysis: { type: Type.STRING },
+              primaryColor: { type: Type.STRING },
+              primaryColorName: { type: Type.STRING },
+              secondaryColor: { type: Type.STRING },
+              secondaryColorName: { type: Type.STRING },
+              dominantVibe: { type: Type.STRING },
+              wallpaperPrompt: { type: Type.STRING }
+            },
+            required: ['name', 'summary', 'archetypeTraits', 'identityMotif', 'aestheticAnalysis', 'primaryColor', 'primaryColorName', 'secondaryColor', 'secondaryColorName', 'dominantVibe', 'wallpaperPrompt']
+          }
+        }
+      }));
+
+      // Safely parse the text to ensure it resolves properly
+      const data = JSON.parse(typeof response.text === 'function' ? response.text() : (response.text || '{}'));
+      return { 
+        statusCode: 200, 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data) 
+      };
+    }
+
+   // ROUTE 2: Generate Wallpaper (Bulletproof Base64 Proxy)
+    if (action === 'generateWallpaper') {
+      const seed = Math.floor(Math.random() * 1000000);
+      const cleanPrompt = encodeURIComponent(`high-end mobile wallpaper, 9:16 aspect ratio, ${payload}, cinematic lighting, 4k, minimalist aesthetic`);
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1920&nologo=true&seed=${seed}&model=flux`;
+
+      try {
+        // 1. Fetch the image directly from the server
+        const imageResponse = await fetch(pollinationsUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept": "image/jpeg"
+          }
+        });
+        
+        if (!imageResponse.ok) {
+           throw new Error(`Pollinations API error: ${imageResponse.status}`);
+        }
+
+        // 2. Convert to ArrayBuffer
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        
+        // 3. Convert to Base64 using Pure JS (Guaranteed not to crash Node)
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        const base64String = btoa(binary);
+        
+        // 4. Create the final safe text URL
+        const imageUrl = `data:image/jpeg;base64,${base64String}`;
+
+        return { 
+          statusCode: 200, 
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl }) 
+        };
+      } catch (err: any) {
+        console.error("Backend Proxy Error:", err);
+        return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+      }
+    }
+
+    return { statusCode: 400, body: "Invalid Action" };
+
+  } catch (error: any) {
+    console.error("Function Error:", error);
+    return { 
+      statusCode: 500, 
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ error: error.message || "Server Error" }) 
+    };
+  }
+};
