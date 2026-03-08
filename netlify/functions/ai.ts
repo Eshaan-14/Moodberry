@@ -1,7 +1,3 @@
-import dns from 'node:dns';
-import { Buffer } from 'node:buffer';
-dns.setDefaultResultOrder('ipv4first');
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 const PERSONA_ADJECTIVES = [
@@ -120,7 +116,6 @@ const PERSONA_NOUNS = [
   "Winner", "Witness", "Wizard", "Wonder", "Worker", "Writer", "Youth", "Zealot"
 ];
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
 async function fetchWithRetry(fn: () => Promise<any>, retries = 3, delay = 1000): Promise<any> {
   try {
@@ -140,6 +135,12 @@ export const handler = async (event: any) => {
   }
 
   try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("API_KEY environment variable is missing in Netlify!");
+    }
+    const ai = new GoogleGenAI({ apiKey });
+
     const { action, payload } = JSON.parse(event.body);
 
     // ROUTE 1: Synthesize Mood (Using Gemini for the "Brain")
